@@ -1,0 +1,8 @@
+model_id: llama3_1_8b_instruct
+model_name: Meta-Llama-3.1-8B-Instruct
+base_url: http://127.0.0.1:8000/v1
+tokenizer_path: ${LLAMA31_MODEL_PATH}
+prompt_template_type: meta-llama3
+context_window: 131072
+api_key_env: null
+request_timeout_seconds: 300

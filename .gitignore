@@ -1,0 +1,73 @@
+# Python 字节码与测试缓存
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 本地安装与构建产物
+*.egg-info/
+build/
+dist/
+*.whl
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 环境变量、令牌与本地凭据
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# 编辑器和操作系统文件
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# 模型权重与模型缓存
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf
+/models/
+/model_cache/
+/.cache/
+/huggingface/
+
+# 作者生成数据与冻结样本：均可由配置和作者生成器重建
+data/generated/**
+!data/generated/.gitkeep
+data/manifests/**
+!data/manifests/.gitkeep
+
+# 模型调用和分析产物：避免提交大文件、运行日志和本机路径
+results/raw/**
+!results/raw/.gitkeep
+results/scored/**
+!results/scored/.gitkeep
+results/cases/**
+!results/cases/.gitkeep
+results/summary/**
+!results/summary/.gitkeep
+results/figures/**
+!results/figures/.gitkeep
+
+# 其他运行日志和临时文件
+*.log
+*.tmp
+*.temp
+*.bak

@@ -1,0 +1,9 @@
+base_config: ../base.yaml
+model_config: ../models/qwen2_5_7b_instruct.yaml
+experiment_id: position_single_8k_p50
+base_experiment_id: single_8k
+task_name: niah_single_2
+max_seq_length: 8192
+num_needle_k: 1
+ablation_factor: evidence_position
+evidence_position_percent: 50

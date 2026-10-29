@@ -1,0 +1,6 @@
+base_config: ../base.yaml
+model_config: ../models/qwen2_5_7b_instruct.yaml
+experiment_id: multikey4_8k
+task_name: niah_multikey_1
+max_seq_length: 8192
+num_needle_k: 4

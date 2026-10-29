@@ -1,0 +1,6 @@
+base_config: ../base.yaml
+model_config: ../models/qwen2_5_7b_instruct.yaml
+experiment_id: single_2k
+task_name: niah_single_2
+max_seq_length: 2048
+num_needle_k: 1

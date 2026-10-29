@@ -1,0 +1,8 @@
+model_id: qwen2_5_7b_instruct
+model_name: Qwen2.5-7B-Instruct
+base_url: http://127.0.0.1:8000/v1
+tokenizer_path: ${QWEN_MODEL_PATH}
+prompt_template_type: base
+context_window: 32768
+api_key_env: null
+request_timeout_seconds: 300

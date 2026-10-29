@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ruler-repro"
+version = "0.1.0"
+description = "RULER NIAH partial reproduction pipeline for Qwen2.5 and Llama 3.1"
+requires-python = ">=3.10"
+dependencies = [
+  "PyYAML>=6.0",
+  "numpy>=1.24",
+  "nltk>=3.8",
+  "wonderwords>=2.2",
+  "tqdm>=4.66",
+  "transformers>=4.43",
+  "sentencepiece>=0.2",
+  "matplotlib>=3.7",
+  "statsmodels>=0.14",
+  "tenacity>=8.2",
+  "beautifulsoup4>=4.12",
+  "html2text>=2024.2.26",
+]
+
+[project.scripts]
+ruler-repro = "ruler_repro.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
