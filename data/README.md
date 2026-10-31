@@ -5,5 +5,3 @@
 Qwen 与 Llama 使用相同的任务条件和固定随机种子，但分别使用自己的分词器与 RULER 输入模板生成数据。两个模型的数据按 `model_id` 隔离，不能相互替换。`configs/ablations` 中的位置消融从同一模型的 `single_8k` 样本生成，并以 `base_sample_id` 保存三个位置变体之间的配对关系。
 
 样本背景来自 RULER 上游脚本下载的 Paul Graham Essays，原始背景文件位于 `../../ref/RULER/scripts/data/synthetic/json/PaulGrahamEssays.json`。正式模型调用只读取 `manifests` 中的冻结清单；生成命令、数据字段与复核方式见[运行与输出说明指南](../docs/运行与输出说明指南.md)。
-
-若目录中仍存在未带 `<model_id>` 层级的早期阶段一文件，它们只作为历史证据保留，新版命令不会读取这些文件。正式结果必须位于模型专属目录。

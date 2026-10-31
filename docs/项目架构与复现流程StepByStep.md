@@ -36,7 +36,7 @@ flowchart LR
 
 这是 Python 项目声明文件，作用包括：
 
-- 声明 Python 版本和依赖，例如 `transformers`、`matplotlib` 与 `statsmodels`。
+- 声明 Python 运行要求和依赖，例如 `transformers`、`matplotlib` 与 `statsmodels`。
 - 告诉安装工具从 `src` 目录查找代码包。
 - 注册 `ruler-repro` 命令，使组员不需要直接运行某个 Python 文件。
 
@@ -174,25 +174,21 @@ results/raw/<model_id>/<experiment_id>/responses.jsonl
 
 该文件把同一模型的三个位置按 `base_sample_id` 对齐，输出逐样本配对表，并计算 Cochran 的 $Q$ 检验、两两精确 McNemar 检验和 Holm 判断阈值。这些统计只作为探索性分析。
 
-## 六、`scripts` 与 `tests`
+## 六、自动测试
 
-### 6.1 `scripts/migrate_results_layout.py`
-
-该脚本把旧版未按模型编号分层的 Qwen 数据和结果复制到新目录。它在复制前后计算 SHA-256 校验值，发现同名文件内容不同时立即停止，并且不会删除旧文件。
-
-### 6.2 `tests/test_config.py`
+### 6.1 `tests/test_config.py`
 
 检查正式配置数量、两个模型配置覆盖和消融配置字段。
 
-### 6.3 `tests/test_prompt_renderer.py`
+### 6.2 `tests/test_prompt_renderer.py`
 
-检查 Qwen 输入保持原有形式，并核对 Llama 特殊标记的顺序与 RULER 上游模板一致。
+检查 Qwen 的 `base` 模板直接保留任务文本，并核对 Llama 特殊标记的顺序与 RULER 上游模板一致。
 
-### 6.4 `tests/test_multi_model_layout.py`
+### 6.3 `tests/test_multi_model_layout.py`
 
-检查 $14$ 个主实验单元、$6$ 个消融单元、双模型结果路径隔离、旧样本兼容和置信区间边界。
+检查 $14$ 个主实验单元、$6$ 个消融单元、双模型结果路径隔离和置信区间边界。
 
-### 6.5 其余测试文件
+### 6.4 其余测试文件
 
 - `test_position_ablation.py`：检查证据重排、答案保留和配对编号。
 - `test_model_client.py`：检查临时错误重试次数受到限制并留下记录。
