@@ -96,7 +96,7 @@ def load_experiment_config(
     merged["model"] = _expand_environment(model)
 
     required = [
-        "experiment_id", "task_name", "max_seq_length", "num_needle_k",
+        "experiment_id", "task_name", "max_seq_length",
         "num_samples", "random_seed", "tokenizer_type",
     ]
     missing = [key for key in required if key not in merged]
@@ -118,7 +118,9 @@ def load_experiment_config(
         experiment_id=str(merged["experiment_id"]),
         task_name=str(merged["task_name"]),
         max_seq_length=int(merged["max_seq_length"]),
-        num_needle_k=int(merged["num_needle_k"]),
+        num_needle_k=(int(merged["num_needle_k"]) if merged.get("num_needle_k") is not None else None),
+        num_chains=(int(merged["num_chains"]) if merged.get("num_chains") is not None else None),
+        num_hops=(int(merged["num_hops"]) if merged.get("num_hops") is not None else None),
         num_samples=int(merged["num_samples"]),
         random_seed=int(merged["random_seed"]),
         tokenizer_type=str(merged["tokenizer_type"]),
@@ -148,18 +150,31 @@ def load_experiment_config(
 
 
 def validate_config(config: ExperimentConfig) -> None:
-    if config.task_name not in {"niah_single_2", "niah_multikey_1"}:
+    if config.task_name not in {"niah_single_2", "niah_multikey_1", "vt"}:
         raise ConfigError(f"当前范围不支持任务：{config.task_name}")
-    if config.max_seq_length not in {2048, 4096, 8192}:
-        raise ConfigError("max_seq_length 必须是 2048、4096 或 8192。")
-    if config.num_needle_k not in {1, 4, 8}:
-        raise ConfigError("num_needle_k 必须是 1、4 或 8。")
+    if config.task_name == "vt":
+        if config.max_seq_length not in {8192, 16384, 32768}:
+            raise ConfigError("变量追踪的 max_seq_length 必须是 8192、16384 或 32768。")
+        if config.num_needle_k is not None:
+            raise ConfigError("变量追踪配置不使用 num_needle_k。")
+        if config.num_chains != 1 or config.num_hops != 4:
+            raise ConfigError("变量追踪固定使用作者设置 num_chains=1、num_hops=4。")
+    else:
+        if config.max_seq_length not in {2048, 4096, 8192}:
+            raise ConfigError("NIAH 的 max_seq_length 必须是 2048、4096 或 8192。")
+        if config.num_needle_k not in {1, 4, 8}:
+            raise ConfigError("NIAH 的 num_needle_k 必须是 1、4 或 8。")
+        if config.num_chains is not None or config.num_hops is not None:
+            raise ConfigError("NIAH 配置不使用 num_chains 或 num_hops。")
     if config.num_samples <= 0:
         raise ConfigError("num_samples 必须大于 0。")
     if config.tokenizer_type != "hf":
         raise ConfigError("本实验固定使用 Hugging Face 分词器类型 hf。")
-    if config.generation.max_output_tokens != 128:
-        raise ConfigError("本实验必须沿用作者 NIAH 的 128 个预留输出词元。")
+    expected_output_tokens = 30 if config.task_name == "vt" else 128
+    if config.generation.max_output_tokens != expected_output_tokens:
+        raise ConfigError(
+            f"{config.task_name} 必须沿用作者的 {expected_output_tokens} 个预留输出词元。"
+        )
     if config.model.context_window < config.max_seq_length:
         raise ConfigError("模型标称上下文小于实验总序列预算。")
     if config.generation.temperature != 0:
@@ -194,4 +209,10 @@ def discover_configs(config_dir: str | Path, include_pilot: bool = False) -> lis
             selected.append(path)
     if not selected:
         raise ConfigError(f"目录中没有可用实验配置：{config_dir}")
+    selected.sort(
+        key=lambda path: (
+            int(_read_yaml(path).get("max_seq_length", 0)),
+            path.name,
+        )
+    )
     return selected

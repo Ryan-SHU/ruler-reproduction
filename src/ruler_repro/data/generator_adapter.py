@@ -31,10 +31,15 @@ def _load_python_mapping(path: Path, variable: str) -> dict[str, Any]:
     return value
 
 
-def _extract_target_key(answer_prefix: str) -> str:
+def _extract_target_key(task_name: str, answer_prefix: str) -> str:
+    if task_name == "vt":
+        match = re.search(r"\bvalue (\d+)\b", answer_prefix)
+        if not match:
+            raise GeneratorError("无法从变量追踪回答前缀解析目标值。")
+        return match.group(1)
     match = re.search(r"\bfor (.+?) mentioned in the provided text", answer_prefix)
     if not match:
-        raise GeneratorError("无法从作者回答前缀解析目标键。")
+        raise GeneratorError("无法从 NIAH 回答前缀解析目标键。")
     return match.group(1).strip()
 
 
@@ -57,12 +62,11 @@ def generate_samples(config: ExperimentConfig, force: bool = False) -> list[Samp
         return samples
 
     scripts_dir = config.paths.upstream_dir / "scripts"
-    niah_path = scripts_dir / "data" / "synthetic" / "niah.py"
     synthetic_yaml = scripts_dir / "synthetic.yaml"
     constants_path = scripts_dir / "data" / "synthetic" / "constants.py"
     templates_path = scripts_dir / "data" / "template.py"
     background_path = scripts_dir / "data" / "synthetic" / "json" / "PaulGrahamEssays.json"
-    for required in [niah_path, synthetic_yaml, constants_path, templates_path, background_path]:
+    for required in [synthetic_yaml, constants_path, templates_path]:
         if not required.is_file():
             raise GeneratorError(f"缺少上游生成器所需文件：{required}")
 
@@ -71,20 +75,30 @@ def generate_samples(config: ExperimentConfig, force: bool = False) -> list[Samp
     if config.task_name not in task_configs:
         raise GeneratorError(f"上游 synthetic.yaml 中没有任务 {config.task_name}。")
     task_config = task_configs[config.task_name]
-    if task_config.get("task") != "niah":
-        raise GeneratorError("当前适配器只允许 NIAH 任务。")
+    task_family = str(task_config.get("task"))
+    if task_family not in {"niah", "variable_tracking"}:
+        raise GeneratorError(f"当前适配器不支持上游任务族：{task_family}")
+    task_script = scripts_dir / "data" / "synthetic" / f"{task_family}.py"
+    if not task_script.is_file():
+        raise GeneratorError(f"缺少上游任务生成器：{task_script}")
+    if task_family == "niah" and not background_path.is_file():
+        raise GeneratorError(f"缺少 NIAH 文章背景数据：{background_path}")
     task_args = dict(task_config.get("args", {}))
-    task_args["num_needle_k"] = config.num_needle_k
+    if task_family == "niah":
+        task_args["num_needle_k"] = config.num_needle_k
+    else:
+        task_args["num_chains"] = config.num_chains
+        task_args["num_hops"] = config.num_hops
 
     tasks = _load_python_mapping(constants_path, "TASKS")
     templates = _load_python_mapping(templates_path, "Templates")
-    niah = tasks["niah"]
+    task_definition = tasks[task_family]
     template_type = config.model.prompt_template_type
     prompt_template = render_author_prompt_template(
         templates,
         template_type,
-        niah["template"],
-        niah["answer_prefix"],
+        task_definition["template"],
+        task_definition["answer_prefix"],
     )
 
     if author_path.exists() and not force:
@@ -92,7 +106,7 @@ def generate_samples(config: ExperimentConfig, force: bool = False) -> list[Samp
     else:
         command = [
             sys.executable,
-            str(niah_path),
+            str(task_script),
             "--save_dir", str(author_path.parent.parent),
             "--save_name", author_path.parent.name,
             "--subset", "validation",
@@ -104,15 +118,20 @@ def generate_samples(config: ExperimentConfig, force: bool = False) -> list[Samp
             "--random_seed", str(config.random_seed),
             "--template", prompt_template,
         ]
-        for key in [
-            "num_needle_k", "num_needle_v", "num_needle_q", "type_haystack",
-            "type_needle_k", "type_needle_v",
-        ]:
+        argument_names = (
+            [
+                "num_needle_k", "num_needle_v", "num_needle_q", "type_haystack",
+                "type_needle_k", "type_needle_v",
+            ]
+            if task_family == "niah"
+            else ["type_haystack", "num_chains", "num_hops"]
+        )
+        for key in argument_names:
             command.extend([f"--{key}", str(task_args[key])])
         try:
             completed = subprocess.run(
                 command,
-                cwd=niah_path.parent,
+                cwd=task_script.parent,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -145,13 +164,19 @@ def generate_samples(config: ExperimentConfig, force: bool = False) -> list[Samp
             input=str(row["input"]),
             answer_prefix=str(row.get("answer_prefix", "")),
             reference_answers=[str(item) for item in row["outputs"]],
-            target_key=_extract_target_key(str(row.get("answer_prefix", ""))),
+            target_key=_extract_target_key(config.task_name, str(row.get("answer_prefix", ""))),
             source_input_tokens=source_input_tokens,
             source_total_tokens=int(row["length"]),
-            answer_token_position=int(row["token_position_answer"]),
+            answer_token_position=(
+                int(row["token_position_answer"])
+                if row.get("token_position_answer") is not None
+                else None
+            ),
             random_seed=config.random_seed,
             source_index=int(row["index"]),
             model_id=config.model.model_id,
+            num_chains=config.num_chains,
+            num_hops=config.num_hops,
         )
         samples.append(sample)
     validate_samples(samples, config)

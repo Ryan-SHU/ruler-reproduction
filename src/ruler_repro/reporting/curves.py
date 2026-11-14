@@ -19,7 +19,40 @@ def write_figures(summaries: list[ExperimentSummary], output_dir: Path) -> list[
     created.extend(_length_curve(main, "niah_multikey_1", output_dir / "multikey_length_curve_by_model.png", needles=4))
     created.extend(_needle_curve(main, output_dir / "multikey_8k_needle_count_by_model.png"))
     created.extend(_position_curve(ablation, output_dir / "position_ablation_by_model.png"))
+    created.extend(_variable_tracking_curve(main, output_dir / "variable_tracking_length_curve_by_model.png"))
     return created
+
+
+def _variable_tracking_curve(
+    summaries: list[ExperimentSummary],
+    path: Path,
+) -> list[Path]:
+    selected = [
+        item for item in summaries
+        if item.task_name == "vt" and item.ruler_score_mean is not None
+    ]
+    selected.sort(key=lambda item: (item.model_id, item.target_length))
+    if not selected:
+        return []
+    fig, axis = plt.subplots(figsize=(6.4, 4.2))
+    for model_id in sorted({item.model_id for item in selected}):
+        group = [item for item in selected if item.model_id == model_id]
+        axis.plot(
+            [item.target_length for item in group],
+            [item.ruler_score_mean for item in group],
+            marker="o",
+            label=model_id,
+        )
+    axis.legend()
+    axis.set_xlabel("Target sequence budget (tokens)")
+    axis.set_ylabel("RULER variable recall score (%)")
+    axis.set_xticks([8192, 16384, 32768], ["8k", "16k", "32k"])
+    axis.set_ylim(0, 100)
+    axis.grid(alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+    return [path]
 
 
 def _length_curve(

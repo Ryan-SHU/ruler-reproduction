@@ -9,13 +9,18 @@ from .schemas import ExperimentConfig
 
 def run_preflight(config: ExperimentConfig, check_server: bool = False) -> list[str]:
     checks: list[tuple[str, bool, str]] = []
+    task_script = "variable_tracking.py" if config.task_name == "vt" else "niah.py"
     upstream_files = [
         config.paths.upstream_dir / "scripts" / "synthetic.yaml",
-        config.paths.upstream_dir / "scripts" / "data" / "synthetic" / "niah.py",
+        config.paths.upstream_dir / "scripts" / "data" / "synthetic" / task_script,
         config.paths.upstream_dir / "scripts" / "data" / "synthetic" / "constants.py",
         config.paths.upstream_dir / "scripts" / "data" / "template.py",
-        config.paths.upstream_dir / "scripts" / "data" / "synthetic" / "json" / "PaulGrahamEssays.json",
     ]
+    if config.task_name != "vt":
+        upstream_files.append(
+            config.paths.upstream_dir / "scripts" / "data" / "synthetic"
+            / "json" / "PaulGrahamEssays.json"
+        )
     for path in upstream_files:
         checks.append((f"文件 {path}", path.is_file(), "缺少上游源码或文章背景数据"))
     tokenizer_path = Path(config.model.tokenizer_path)

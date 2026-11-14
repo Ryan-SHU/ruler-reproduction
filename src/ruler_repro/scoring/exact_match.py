@@ -9,6 +9,7 @@ class ExactMatchScorer:
         return prediction.strip()
 
     def score(self, prediction: str, references: list[str]) -> bool:
-        if len(references) != 1:
-            raise ValueError("本项目严格匹配只接受唯一标准答案。")
-        return self.normalize(prediction) == references[0]
+        if not references:
+            raise ValueError("标准答案列表不能为空。")
+        expected = " ".join(references)
+        return self.normalize(prediction) == expected

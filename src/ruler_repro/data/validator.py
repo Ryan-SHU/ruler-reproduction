@@ -24,19 +24,37 @@ def validate_samples(samples: list[SampleRecord], config: ExperimentConfig) -> N
     for sample in samples:
         if sample.model_id not in {config.model.model_id, "legacy"}:
             raise SampleValidationError(f"{sample.sample_id} 的模型编号与配置不一致。")
-        if len(sample.reference_answers) != 1:
-            raise SampleValidationError(f"{sample.sample_id} 的标准答案数量不是 1。")
-        answer = sample.reference_answers[0]
-        if not re.fullmatch(r"\d{7}", answer):
-            raise SampleValidationError(f"{sample.sample_id} 的标准答案不是七位数字。")
-        if answer not in sample.input:
-            raise SampleValidationError(f"{sample.sample_id} 的标准答案未出现在输入中。")
+        if config.task_name == "vt":
+            expected_answers = (config.num_hops or 0) + 1
+            if len(sample.reference_answers) != expected_answers:
+                raise SampleValidationError(
+                    f"{sample.sample_id} 的变量答案数量不是 {expected_answers}。"
+                )
+            for answer in sample.reference_answers:
+                if not re.fullmatch(r"[A-Z]{5}", answer):
+                    raise SampleValidationError(f"{sample.sample_id} 的变量名格式无效：{answer}。")
+                if answer not in sample.input:
+                    raise SampleValidationError(f"{sample.sample_id} 的变量答案未出现在输入中：{answer}。")
+            if sample.num_chains != config.num_chains or sample.num_hops != config.num_hops:
+                raise SampleValidationError(f"{sample.sample_id} 的变量链设置与配置不一致。")
+        else:
+            if len(sample.reference_answers) != 1:
+                raise SampleValidationError(f"{sample.sample_id} 的标准答案数量不是 1。")
+            answer = sample.reference_answers[0]
+            if not re.fullmatch(r"\d{7}", answer):
+                raise SampleValidationError(f"{sample.sample_id} 的标准答案不是七位数字。")
+            if answer not in sample.input:
+                raise SampleValidationError(f"{sample.sample_id} 的标准答案未出现在输入中。")
         if sample.source_total_tokens > config.max_seq_length:
             raise SampleValidationError(f"{sample.sample_id} 超过目标总序列预算。")
         expected_total = sample.source_input_tokens + config.generation.max_output_tokens
         if expected_total > config.max_seq_length:
             raise SampleValidationError(f"{sample.sample_id} 的复算总长度超过预算。")
-        if sample.source_index < 0 or sample.answer_token_position < 0:
+        if sample.source_index < 0:
+            raise SampleValidationError(f"{sample.sample_id} 的源数据编号无效。")
+        if config.task_name != "vt" and (
+            sample.answer_token_position is None or sample.answer_token_position < 0
+        ):
             raise SampleValidationError(f"{sample.sample_id} 的答案位置无效。")
         if config.ablation_factor == "evidence_position":
             if sample.base_sample_id is None:

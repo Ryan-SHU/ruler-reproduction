@@ -15,6 +15,7 @@ def _classify_failure(
     normalized: str,
     exact: bool,
     ruler: bool,
+    ruler_score: float = 0.0,
 ) -> tuple[str | None, str]:
     if response is None:
         return "missing_response", "没有找到该样本的模型响应。"
@@ -26,6 +27,14 @@ def _classify_failure(
         return "empty_answer", "接口成功返回，但回答去除首尾空白后为空。"
     if ruler:
         return "strict_format_failure", "回答包含完整标准答案，但含有额外字符。"
+    if sample.task_name == "vt":
+        if ruler_score > 0:
+            matched = round(ruler_score * len(sample.reference_answers))
+            return (
+                "partial_retrieval",
+                f"回答命中 {matched}/{len(sample.reference_answers)} 个标准变量名。",
+            )
+        return "unrelated_answer", "回答没有命中任何标准变量名。"
     reference = sample.reference_answers[0]
     digit_groups = set(re.findall(r"(?<!\d)\d{7}(?!\d)", sample.input))
     predicted_groups = set(re.findall(r"(?<!\d)\d{7}(?!\d)", normalized))
@@ -56,8 +65,14 @@ def score_experiment(config: ExperimentConfig, force: bool = False) -> list[Scor
         prediction = response.raw_text if valid and response.raw_text is not None else ""
         normalized = exact_scorer.normalize(prediction)
         exact = exact_scorer.score(prediction, sample.reference_answers) if valid else False
-        ruler = ruler_scorer.score(prediction, sample.reference_answers) if valid else False
-        category, note = _classify_failure(sample, response, normalized, exact, ruler)
+        ruler_score = (
+            ruler_scorer.score_fraction(prediction, sample.reference_answers)
+            if valid else 0.0
+        )
+        ruler = ruler_score == 1.0
+        category, note = _classify_failure(
+            sample, response, normalized, exact, ruler, ruler_score
+        )
         scores.append(
             ScoreRecord(
                 sample_id=sample.sample_id,
@@ -69,6 +84,7 @@ def score_experiment(config: ExperimentConfig, force: bool = False) -> list[Scor
                 failure_category=category,
                 decision_note=note,
                 model_id=config.model.model_id,
+                ruler_score=ruler_score,
             )
         )
     write_jsonl(scores_path, scores, overwrite=force or scores_path.exists())

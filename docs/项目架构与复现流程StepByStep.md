@@ -78,6 +78,10 @@ flowchart LR
 
 这两个配置把样本数缩小为 $2$，分别覆盖单针和四针 $2\mathrm{k}$，用于阶段一验证端到端流程。`formal: false` 表示它们不属于正式结果。
 
+### 4.7 `configs/variable_tracking/*.yaml`
+
+三个配置对应变量追踪的 $8\mathrm{k}$、$16\mathrm{k}$ 和 $32\mathrm{k}$。每个条件使用一条变量链和四次赋值传递，并预留作者规定的 $30$ 个输出词元。A 分别为 Qwen 与 Llama 运行三个配置。
+
 ## 五、`src/ruler_repro`：代码怎样协作
 
 ### 5.1 `cli.py`：统一命令入口
@@ -96,12 +100,12 @@ flowchart LR
 - `ExperimentConfig`：任务条件、生成参数、路径和消融设置。
 - `SampleRecord`：输入、标准答案、实际长度和证据位置。
 - `ModelRequest` 与 `ModelResponse`：发给模型的请求和模型返回结果。
-- `ScoreRecord`：严格匹配、宽松匹配和失败类型。
+- `ScoreRecord`：严格匹配、RULER 完整命中、RULER 作者得分和失败类型。
 - `ExperimentSummary`：单个模型—实验单元的汇总指标。
 
 ### 5.4 `preflight.py`：正式运行前检查
 
-该文件检查 RULER 上游脚本、Paul Graham Essays 背景文件、模型目录、Python 依赖和 NLTK 句子切分资源。加入 `--check-server` 后，它还会检查 `vLLM` 服务是否可访问，以及服务暴露的模型名是否正确。
+该文件按任务检查 RULER 上游脚本、模型目录、Python 依赖和 NLTK 句子切分资源；NIAH 另外检查 Paul Graham Essays 背景文件。加入 `--check-server` 后，它还会检查 `vLLM` 服务是否可访问，以及服务暴露的模型名是否正确。
 
 ### 5.5 `inference/prompt_renderer.py`：选择模型模板
 
@@ -109,7 +113,7 @@ flowchart LR
 
 ### 5.6 `data/generator_adapter.py`：调用作者生成器
 
-这是本项目与 RULER 原始数据代码之间的适配层。它读取作者的任务定义和模板，使用当前模型的分词器运行 `niah.py`，再把作者输出转换为统一的 `SampleRecord`。
+这是本项目与 RULER 原始数据代码之间的适配层。它读取作者的任务定义和模板，使用当前模型的分词器运行 NIAH 的 `niah.py` 或变量追踪的 `variable_tracking.py`，再把作者输出转换为统一的 `SampleRecord`。
 
 生成结果分别进入：
 
@@ -126,7 +130,7 @@ data/manifests/<model_id>/<experiment_id>/
 
 ### 5.8 `data/validator.py`：验证样本
 
-该文件检查样本数、编号唯一性、标准答案格式、答案是否出现在输入中、总长度预算和消融字段。验证不通过时不会进入模型推理。
+该文件检查样本数、编号唯一性、标准答案格式、答案是否出现在输入中、总长度预算和任务专属字段。NIAH 检查七位数字，变量追踪检查五个大写变量名及一条四跳链，消融任务另检查配对字段。验证不通过时不会进入模型推理。
 
 ### 5.9 `data/manifest.py`：读写 JSONL
 
@@ -152,19 +156,19 @@ results/raw/<model_id>/<experiment_id>/responses.jsonl
 
 ### 5.13 `pipeline/evaluate.py`
 
-该文件把样本、最新模型响应和标准答案对应起来，调用两个评分器，并把结果写入 `results/scored/<model_id>/<experiment_id>/scores.jsonl`。它还区分格式错误、干扰项混淆、不完整答案、空回答、无关回答和调用失败。
+该文件把样本、最新模型响应和标准答案对应起来，调用两个评分器，并把结果写入 `results/scored/<model_id>/<experiment_id>/scores.jsonl`。它区分格式错误、干扰项混淆、变量追踪部分命中、不完整答案、空回答、无关回答和调用失败。
 
 ### 5.14 `scoring/exact_match.py` 与 `scoring/ruler_match.py`
 
-`exact_match.py` 实现课程要求的严格答案匹配，只去除回答首尾空白；`ruler_match.py` 实现 RULER 宽松匹配，检查回答是否包含完整标准答案。两个指标分别保存，不能相互替换。
+`exact_match.py` 实现课程要求的严格答案匹配，只去除回答首尾空白；多答案任务按作者顺序用空格连接为规范答案。`ruler_match.py` 实现 RULER 的 `string_match_all`：逐个检查标准答案是否出现在回答中，并保存命中比例。完整命中与作者得分分别保存。
 
 ### 5.15 `pipeline/summarize.py`
 
-该文件按模型和实验条件统计正确数、正确率、Wilson $95\%$ 置信区间、实际词元长度、调用次数和重试次数。正式配置在响应或评分不足 $50$ 条时会停止汇总，防止把不完整结果当作正式表格。
+该文件按模型和实验条件统计正确数、正确率、RULER 作者平均得分、Wilson $95\%$ 置信区间、实际词元长度、调用次数和重试次数。正式配置在响应或评分不足 $50$ 条时会停止汇总，防止把不完整结果当作正式表格。变量追踪使用独立文件名，不覆盖 NIAH 汇总。
 
 ### 5.16 `reporting/curves.py`
 
-该文件把汇总结果绘制为单针长度曲线、四针长度曲线、四针—八针对照和双模型证据位置曲线。图像保存在 `results/figures`。
+该文件把汇总结果绘制为单针长度曲线、四针长度曲线、四针—八针对照、双模型证据位置曲线和变量追踪作者得分曲线。图像保存在 `results/figures`。
 
 ### 5.17 `reporting/cases.py`
 
@@ -178,7 +182,7 @@ results/raw/<model_id>/<experiment_id>/responses.jsonl
 
 ### 6.1 `tests/test_config.py`
 
-检查正式配置数量、两个模型配置覆盖和消融配置字段。
+检查 NIAH、变量追踪和消融配置，以及两个模型的配置覆盖。
 
 ### 6.2 `tests/test_prompt_renderer.py`
 
@@ -192,8 +196,8 @@ results/raw/<model_id>/<experiment_id>/responses.jsonl
 
 - `test_position_ablation.py`：检查证据重排、答案保留和配对编号。
 - `test_model_client.py`：检查临时错误重试次数受到限制并留下记录。
-- `test_evaluate.py`：检查主要失败类别。
-- `test_scoring.py`：检查严格匹配与宽松匹配的差别。
+- `test_evaluate.py`：检查主要失败类别和变量追踪部分命中。
+- `test_scoring.py`：检查严格匹配、完整命中和变量追踪作者得分。
 - `test_manifest.py`：检查 JSONL 往返读写和最新记录选择。
 
 ## 七、`data` 与 `results`：运行后会得到什么
@@ -214,7 +218,7 @@ flowchart TD
 
 ### Step 1：确定实验矩阵
 
-七个主实验条件分别用于 Qwen 与 Llama，形成 $14$ 个模型—任务单元；三个位置条件分别用于两个模型，形成 $6$ 个模型—位置单元。正式调用总量为主实验 $700$ 次加消融 $300$ 次，共 $1000$ 次。
+七个 NIAH 主实验条件分别用于 Qwen 与 Llama，形成 $14$ 个模型—任务单元；三个位置条件分别用于两个模型，形成 $6$ 个模型—位置单元；三个变量追踪长度分别用于两个模型，形成 $6$ 个模型—长度单元。正式调用总量为 $1300$ 次。
 
 ### Step 2：选择模型并启动服务
 
@@ -242,7 +246,7 @@ flowchart TD
 
 ### Step 8：逐样本评分
 
-`score` 同时计算严格答案匹配与 RULER 宽松匹配。调用失败保持为运行异常；成功调用但答案错误才进入模型错误类别。
+`score` 同时计算严格答案匹配、RULER 完整命中和 RULER 作者得分。调用失败保持为运行异常；变量追踪回答命中部分标准变量时记录为部分检索。
 
 ### Step 9：切换模型并重复
 
@@ -268,9 +272,13 @@ A 按 `<model_id>/<experiment_id>` 合并目录。`summarize` 在正式单元不
 
 `cases` 从原始响应和评分中导出可回溯案例。案例保留输入、目标键、标准答案、原始回答和判定理由，供报告中的失败分析使用。
 
-### Step 15：形成报告结论
+### Step 15：完成变量追踪追加实验
 
-报告分别回答两个问题：两个模型在本组所测 RULER 条件下表现如何；固定某一模型和单针 $8\mathrm{k}$ 后，证据位置变化与正确率有什么关系。结论只覆盖实际运行的任务、模型和不超过 $8\mathrm{k}$ 的输入范围。
+A 把两个模型服务的最大长度设置为 $32768$，分别生成并运行 `vt_8k`、`vt_16k` 和 `vt_32k`。汇总同时报告五个变量全部命中的比例与逐变量平均命中比例，并生成长度曲线和独立案例目录。
+
+### Step 16：形成报告结论
+
+报告分别回答三个问题：两个模型在本组所测 NIAH 条件下表现如何；固定某一模型和单针 $8\mathrm{k}$ 后，证据位置变化与正确率有什么关系；变量追踪从 $8\mathrm{k}$ 增长到 $32\mathrm{k}$ 时，完整命中率和逐变量作者得分如何变化。结论只覆盖实际运行的任务、模型和长度。
 
 ## 九、一条样本如何贯穿整个项目
 

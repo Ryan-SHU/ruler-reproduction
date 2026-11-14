@@ -29,6 +29,10 @@ def summarize_experiment(config: ExperimentConfig) -> ExperimentSummary:
     api_outputs = [item.output_tokens for item in all_responses if item.output_tokens is not None]
     exact_correct = sum(score.exact_match for score in valid)
     ruler_correct = sum(score.ruler_match for score in valid)
+    ruler_score_mean = (
+        round(statistics.mean(score.ruler_score for score in valid) * 100, 2)
+        if valid else None
+    )
     valid_count = len(valid)
     status_counts = Counter(response.status for response in responses)
     total_attempts = sum(response.attempt_count for response in all_responses)
@@ -39,6 +43,8 @@ def summarize_experiment(config: ExperimentConfig) -> ExperimentSummary:
         task_name=config.task_name,
         target_length=config.max_seq_length,
         num_needle_k=config.num_needle_k,
+        num_chains=config.num_chains,
+        num_hops=config.num_hops,
         planned_samples=config.num_samples,
         response_records=len(responses),
         successful_calls=status_counts.get("success", 0),
@@ -49,6 +55,7 @@ def summarize_experiment(config: ExperimentConfig) -> ExperimentSummary:
         exact_ci95_high=_wilson_ci(exact_correct, valid_count)[1],
         ruler_correct=ruler_correct,
         ruler_match_rate=round(ruler_correct / valid_count * 100, 2) if valid_count else None,
+        ruler_score_mean=ruler_score_mean,
         ruler_ci95_low=_wilson_ci(ruler_correct, valid_count)[0],
         ruler_ci95_high=_wilson_ci(ruler_correct, valid_count)[1],
         total_attempts=total_attempts,
@@ -83,12 +90,21 @@ def write_summaries(configs: list[ExperimentConfig]) -> list[ExperimentSummary]:
     summary_dir.mkdir(parents=True, exist_ok=True)
     rows = [summary.to_dict() for summary in summaries]
     is_ablation = all(config.ablation_factor is not None for config in configs)
-    metrics_name = "position_ablation_metrics.csv" if is_ablation else "model_experiment_metrics.csv"
-    plot_name = "position_ablation_plot_data.csv" if is_ablation else "plot_data.csv"
+    is_variable_tracking = all(config.task_name == "vt" for config in configs)
+    if is_ablation:
+        metrics_name = "position_ablation_metrics.csv"
+        plot_name = "position_ablation_plot_data.csv"
+    elif is_variable_tracking:
+        metrics_name = "variable_tracking_metrics.csv"
+        plot_name = "variable_tracking_plot_data.csv"
+    else:
+        metrics_name = "model_experiment_metrics.csv"
+        plot_name = "plot_data.csv"
     _write_csv(summary_dir / metrics_name, rows)
     plot_fields = [
         "model_id", "model_name", "experiment_id", "task_name", "target_length", "num_needle_k",
-        "valid_scored_samples", "exact_match_rate", "ruler_match_rate",
+        "num_chains", "num_hops", "valid_scored_samples", "exact_match_rate",
+        "ruler_match_rate", "ruler_score_mean",
         "source_input_mean",
     ]
     _write_csv(

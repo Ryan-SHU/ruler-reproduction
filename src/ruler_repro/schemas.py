@@ -45,7 +45,9 @@ class ExperimentConfig:
     experiment_id: str
     task_name: str
     max_seq_length: int
-    num_needle_k: int
+    num_needle_k: int | None
+    num_chains: int | None
+    num_hops: int | None
     num_samples: int
     random_seed: int
     tokenizer_type: str
@@ -70,14 +72,14 @@ class SampleRecord:
     experiment_id: str
     task_name: str
     target_length: int
-    num_needle_k: int
+    num_needle_k: int | None
     input: str
     answer_prefix: str
     reference_answers: list[str]
     target_key: str
     source_input_tokens: int
     source_total_tokens: int
-    answer_token_position: int
+    answer_token_position: int | None
     random_seed: int
     source_index: int
     model_id: str = "legacy"
@@ -85,6 +87,8 @@ class SampleRecord:
     ablation_factor: str | None = None
     evidence_position_target_percent: int | None = None
     evidence_position_actual_percent: float | None = None
+    num_chains: int | None = None
+    num_hops: int | None = None
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "SampleRecord":
@@ -140,10 +144,14 @@ class ScoreRecord:
     failure_category: str | None
     decision_note: str
     model_id: str = "legacy"
+    ruler_score: float = 0.0
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "ScoreRecord":
-        return cls(**value)
+        normalized = dict(value)
+        if "ruler_score" not in normalized:
+            normalized["ruler_score"] = 1.0 if normalized.get("ruler_match") else 0.0
+        return cls(**normalized)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -156,7 +164,9 @@ class ExperimentSummary:
     experiment_id: str
     task_name: str
     target_length: int
-    num_needle_k: int
+    num_needle_k: int | None
+    num_chains: int | None
+    num_hops: int | None
     planned_samples: int
     response_records: int
     successful_calls: int
@@ -167,6 +177,7 @@ class ExperimentSummary:
     exact_ci95_high: float | None
     ruler_correct: int
     ruler_match_rate: float | None
+    ruler_score_mean: float | None
     ruler_ci95_low: float | None
     ruler_ci95_high: float | None
     total_attempts: int

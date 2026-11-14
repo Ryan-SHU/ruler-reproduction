@@ -35,7 +35,11 @@ def export_cases(configs: list[ExperimentConfig], minimum_cases: int = 10) -> li
 
     if len(rows) < minimum_cases:
         correct_candidates.sort(
-            key=lambda item: (item["source_input_tokens"], item["answer_token_position"]),
+            key=lambda item: (
+                item["source_input_tokens"],
+                item["answer_token_position"]
+                if item["answer_token_position"] is not None else -1,
+            ),
             reverse=True,
         )
         needed = minimum_cases - len(rows)
@@ -45,6 +49,8 @@ def export_cases(configs: list[ExperimentConfig], minimum_cases: int = 10) -> li
             rows.append(case)
 
     output_dir = configs[0].paths.results_dir / "cases"
+    if all(config.task_name == "vt" for config in configs):
+        output_dir = output_dir / "variable_tracking"
     write_jsonl(output_dir / "cases.jsonl", rows, overwrite=True)
     _write_summary_csv(output_dir / "cases_summary.csv", rows)
     for model_id in sorted({config.model.model_id for config in configs}):
@@ -68,6 +74,8 @@ def _make_case(
         "task_name": sample.task_name,
         "target_length": sample.target_length,
         "num_needle_k": sample.num_needle_k,
+        "num_chains": sample.num_chains,
+        "num_hops": sample.num_hops,
         "source_input_tokens": sample.source_input_tokens,
         "answer_token_position": sample.answer_token_position,
         "target_key": sample.target_key,
@@ -76,6 +84,7 @@ def _make_case(
         "raw_prediction": response.raw_text if response else None,
         "exact_match": score.exact_match,
         "ruler_match": score.ruler_match,
+        "ruler_score": score.ruler_score,
         "failure_category": score.failure_category,
         "decision_note": score.decision_note,
         "input": sample.input,
@@ -86,9 +95,10 @@ def _make_case(
 def _write_summary_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     fields = [
         "case_id", "model_id", "sample_id", "experiment_id", "target_length", "num_needle_k",
+        "num_chains", "num_hops",
         "source_input_tokens", "answer_token_position", "target_key",
         "reference_answers", "model_status", "raw_prediction", "exact_match",
-        "ruler_match", "failure_category", "decision_note",
+        "ruler_match", "ruler_score", "failure_category", "decision_note",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")

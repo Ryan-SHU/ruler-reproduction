@@ -42,6 +42,23 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(config.evidence_position_percent, 50)
         self.assertEqual(config.base_experiment_id, "single_8k")
 
+    @patch.dict(os.environ, {"QWEN_MODEL_PATH": "/models/Qwen2.5-7B-Instruct"})
+    def test_variable_tracking_config(self):
+        config = load_experiment_config(
+            PROJECT_ROOT / "configs/variable_tracking/vt_32k.yaml"
+        )
+        self.assertEqual(config.task_name, "vt")
+        self.assertEqual(config.max_seq_length, 32768)
+        self.assertIsNone(config.num_needle_k)
+        self.assertEqual(config.num_chains, 1)
+        self.assertEqual(config.num_hops, 4)
+        self.assertEqual(config.generation.max_output_tokens, 30)
+        paths = discover_configs(PROJECT_ROOT / "configs/variable_tracking")
+        self.assertEqual(
+            [path.stem for path in paths],
+            ["vt_8k", "vt_16k", "vt_32k"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

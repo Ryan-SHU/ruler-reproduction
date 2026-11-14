@@ -53,6 +53,31 @@ class FailureClassificationTest(unittest.TestCase):
         category, _ = _classify_failure(sample(), response(""), "", False, False)
         self.assertEqual(category, "empty_answer")
 
+    def test_variable_tracking_partial_retrieval(self):
+        item = SampleRecord(
+            sample_id="vt-42-0000",
+            experiment_id="vt_8k",
+            task_name="vt",
+            target_length=8192,
+            num_needle_k=None,
+            input="VAR AAAAA = 12345. VAR BBBBB = VAR AAAAA.",
+            answer_prefix=" Answer: variables assigned the value 12345 are: ",
+            reference_answers=["AAAAA", "BBBBB"],
+            target_key="12345",
+            source_input_tokens=100,
+            source_total_tokens=130,
+            answer_token_position=None,
+            random_seed=42,
+            source_index=0,
+            num_chains=1,
+            num_hops=1,
+        )
+        category, note = _classify_failure(
+            item, response("AAAAA"), "AAAAA", False, False, 0.5
+        )
+        self.assertEqual(category, "partial_retrieval")
+        self.assertIn("1/2", note)
+
 
 if __name__ == "__main__":
     unittest.main()
