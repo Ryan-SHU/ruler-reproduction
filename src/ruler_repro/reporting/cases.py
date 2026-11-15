@@ -51,6 +51,8 @@ def export_cases(configs: list[ExperimentConfig], minimum_cases: int = 10) -> li
     output_dir = configs[0].paths.results_dir / "cases"
     if all(config.task_name == "vt" for config in configs):
         output_dir = output_dir / "variable_tracking"
+        if any(config.ablation_factor == "num_hops" for config in configs):
+            output_dir = output_dir / "hops_ablation"
     write_jsonl(output_dir / "cases.jsonl", rows, overwrite=True)
     _write_summary_csv(output_dir / "cases_summary.csv", rows)
     for model_id in sorted({config.model.model_id for config in configs}):

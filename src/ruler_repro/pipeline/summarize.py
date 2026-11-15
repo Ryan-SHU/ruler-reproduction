@@ -91,7 +91,11 @@ def write_summaries(configs: list[ExperimentConfig]) -> list[ExperimentSummary]:
     rows = [summary.to_dict() for summary in summaries]
     is_ablation = all(config.ablation_factor is not None for config in configs)
     is_variable_tracking = all(config.task_name == "vt" for config in configs)
-    if is_ablation:
+    is_vt_hops = is_variable_tracking and any(config.ablation_factor == "num_hops" for config in configs)
+    if is_vt_hops:
+        metrics_name = "vt_hops_ablation_metrics.csv"
+        plot_name = "vt_hops_ablation_plot_data.csv"
+    elif is_ablation:
         metrics_name = "position_ablation_metrics.csv"
         plot_name = "position_ablation_plot_data.csv"
     elif is_variable_tracking:

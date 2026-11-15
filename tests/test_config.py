@@ -59,6 +59,14 @@ class ConfigTest(unittest.TestCase):
             ["vt_8k", "vt_16k", "vt_32k"],
         )
 
+    @patch.dict(os.environ, {"QWEN_MODEL_PATH": "/models/Qwen2.5-7B-Instruct"})
+    def test_vt_hops_ablation_reuses_baseline(self):
+        paths = discover_configs(PROJECT_ROOT / "configs/vt_hops_ablation")
+        configs = [load_experiment_config(path) for path in paths]
+        self.assertEqual({config.experiment_id for config in configs}, {"vt_32k", "vt_32k_hops2"})
+        self.assertEqual({config.num_hops for config in configs}, {2, 4})
+        self.assertEqual(next(config for config in configs if config.num_hops == 2).base_experiment_id, "vt_32k")
+
 
 if __name__ == "__main__":
     unittest.main()

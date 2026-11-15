@@ -1,0 +1,10 @@
+base_config: ../base.yaml
+model_config: ../models/qwen2_5_7b_instruct.yaml
+experiment_id: vt_32k
+task_name: vt
+max_seq_length: 32768
+num_chains: 1
+num_hops: 4
+
+generation:
+  max_output_tokens: 30

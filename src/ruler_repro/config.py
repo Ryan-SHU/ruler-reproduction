@@ -157,8 +157,9 @@ def validate_config(config: ExperimentConfig) -> None:
             raise ConfigError("变量追踪的 max_seq_length 必须是 8192、16384 或 32768。")
         if config.num_needle_k is not None:
             raise ConfigError("变量追踪配置不使用 num_needle_k。")
-        if config.num_chains != 1 or config.num_hops != 4:
-            raise ConfigError("变量追踪固定使用作者设置 num_chains=1、num_hops=4。")
+        expected_hops = 2 if config.ablation_factor == "num_hops" else 4
+        if config.num_chains != 1 or config.num_hops != expected_hops:
+            raise ConfigError(f"变量追踪要求 num_chains=1、num_hops={expected_hops}。")
     else:
         if config.max_seq_length not in {2048, 4096, 8192}:
             raise ConfigError("NIAH 的 max_seq_length 必须是 2048、4096 或 8192。")
@@ -188,8 +189,14 @@ def validate_config(config: ExperimentConfig) -> None:
     if config.model.prompt_template_type not in {"base", "meta-llama3"}:
         raise ConfigError("当前只支持 base 与 meta-llama3 输入模板。")
     if config.ablation_factor is not None:
+        if config.ablation_factor == "num_hops":
+            if config.task_name != "vt" or config.max_seq_length != 32768:
+                raise ConfigError("变量跳数消融必须使用 32768 长度的 VT 任务。")
+            if config.base_experiment_id != "vt_32k":
+                raise ConfigError("变量跳数消融必须引用 vt_32k 基线。")
+            return
         if config.ablation_factor != "evidence_position":
-            raise ConfigError("当前只支持 evidence_position 消融。")
+            raise ConfigError("当前只支持 evidence_position 或 num_hops 消融。")
         if config.task_name != "niah_single_2" or config.num_needle_k != 1:
             raise ConfigError("证据位置消融必须使用单针任务。")
         if config.max_seq_length != 8192:
