@@ -6,8 +6,14 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 
 from ..schemas import ExperimentSummary
+
+_cjk_font = Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
+if _cjk_font.exists():
+    font_manager.fontManager.addfont(str(_cjk_font))
+    plt.rcParams["font.sans-serif"] = [font_manager.FontProperties(fname=str(_cjk_font)).get_name(), "DejaVu Sans"]
 
 
 def write_figures(summaries: list[ExperimentSummary], output_dir: Path) -> list[Path]:
@@ -43,18 +49,21 @@ def _variable_tracking_curve(
             [item.target_length for item in group],
             [item.ruler_score_mean for item in group],
             marker="o",
-            label=model_id,
+            label=group[0].model_name,
         )
     axis.legend()
-    axis.set_xlabel("Target sequence budget (tokens)")
-    axis.set_ylabel("RULER variable recall score (%)")
+    axis.set_xlabel("目标长度（词元）")
+    axis.set_ylabel("RULER 变量追踪得分（%）")
     axis.set_xticks([8192, 16384, 32768], ["8k", "16k", "32k"])
-    axis.set_ylim(0, 100)
+    axis.set_ylim(90, 100.5)
+    axis.set_yticks([90, 92, 94, 96, 98, 100])
     axis.grid(alpha=0.25)
     fig.tight_layout()
     fig.savefig(path, dpi=180)
+    pdf_path = path.with_suffix(".pdf")
+    fig.savefig(pdf_path)
     plt.close(fig)
-    return [path]
+    return [path, pdf_path]
 
 
 def _vt_hops_curve(summaries: list[ExperimentSummary], path: Path) -> list[Path]:
@@ -68,17 +77,20 @@ def _vt_hops_curve(summaries: list[ExperimentSummary], path: Path) -> list[Path]
     fig, axis = plt.subplots(figsize=(6.4, 4.2))
     for model_id in sorted({item.model_id for item in selected}):
         group = sorted((item for item in selected if item.model_id == model_id), key=lambda item: item.num_hops)
-        axis.plot([item.num_hops for item in group], [item.ruler_score_mean for item in group], marker="o", label=model_id)
-    axis.set_xlabel("Number of assignment hops")
-    axis.set_ylabel("RULER variable recall score (%)")
+        axis.plot([item.num_hops for item in group], [item.ruler_score_mean for item in group], marker="o", label=group[0].model_name)
+    axis.set_xlabel("赋值跳数")
+    axis.set_ylabel("RULER 变量追踪得分（%）")
     axis.set_xticks([2, 4])
-    axis.set_ylim(0, 100)
+    axis.set_ylim(90, 100.5)
+    axis.set_yticks([90, 92, 94, 96, 98, 100])
     axis.grid(alpha=0.25)
     axis.legend()
     fig.tight_layout()
     fig.savefig(path, dpi=180)
+    pdf_path = path.with_suffix(".pdf")
+    fig.savefig(pdf_path)
     plt.close(fig)
-    return [path]
+    return [path, pdf_path]
 
 
 def _length_curve(
